@@ -5,7 +5,7 @@ from threading import Thread
 import signal
 import sys
 from scapy.all import *
-from concurrent.futures import ThreadPoolExecutor
+import concurrent.futures
 
 
 def send_offer(UDP_IP):
@@ -25,37 +25,31 @@ def send_offer(UDP_IP):
     sock.close()
     
 
-def play(TCP_IP):
-    TCP_PORT = 2086
-    BUFFER_SIZE = 1024
+def play(server_socket):
     teams = {}
     group1 = []
     group2 = []
-    
-    # init socket to address family (host, port) and for TCP connection
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((TCP_IP, TCP_PORT))
 
     # make socket a server's one, 5 is only advisory for num of connections
-    s.listen(5)
+    server_socket.listen(5)
 
     game_over_msg = 'Some wierd stuff happend\n'
     try:
-        connect_to_clients(s, teams, group1, group2)
+        game = connect_to_clients(server_socket, teams, group1, group2)
 
         # if no teams don't start game
-        if bool(teams) :
+        if not game :
             return False
         
         for conn in teams.values():
-            conn.send(b'Group 1 :\n==\n{0}\n'.format('\n'.join(group1)))
-            conn.send(b'Group 2 :\n==\n{0}\n'.format('\n'.join(group2)))
+            conn.send('Group 1 :\n==\n{0}\n'.format('\n'.join(group1)).encode())
+            conn.send('Group 2 :\n==\n{0}\n'.format('\n'.join(group2)).encode())
 
         # shutdown automatically
-        with ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             scores_futures = []
             for team, conn in teams.items():
-                scores_futures.append(executor.submit(player_runnable, args=[team, conn]))
+                scores_futures.append(executor.submit(player_runnable, team=team, conn=conn))
                 conn.send(b'START SPAMMING!!!!!\n')
 
             # Main thread computes results
@@ -81,8 +75,6 @@ def play(TCP_IP):
         for conn in teams.values():
             conn.send(struct.pack('s', game_over_msg.encode()))
             conn.close()
-        print('closing socket')
-        s.close()
     
     return True
 
@@ -102,25 +94,30 @@ def connect_to_clients(socket, teams, group1, group2):
     start_time = time.time()
     group_index = 1
     if time.time() - start_time < 10:
-        conn, addr = socket.accept()
-        print(f'Connection address:{addr}')
+        try:
+            conn, _ = socket.accept()
 
-        data = conn.recv(BUFFER_SIZE)
-        team_name = data.decode("utf-8")
-        print(f'received data:{team_name}')
+            data = conn.recv(BUFFER_SIZE)
+            team_name = data.decode("utf-8")
+            print(f'Team: {team_name}')
 
-        teams[team_name] = conn
+            teams[team_name] = conn
 
-        # assign team to a group
-        if group_index % 2 == 0:
-            group2.append(team_name)
-        else:
-            group1.append(team_name)
-        conn.send(b'Welcome to Keyboard Spamming Battle Royale.')
-        group_index += 1
+            # assign team to a group
+            if group_index % 2 == 0:
+                group2.append(team_name)
+            else:
+                group1.append(team_name)
+            conn.send(b'Welcome to Keyboard Spamming Battle Royale.\n')
+            group_index += 1
+        except Exception as exc:
+
+            # TODO: handle timeout better
+            print('Error {0}'.format(exc))
+    return group_index > 1
 
 def quit(sig, frame):
-    print('Goosbye!')
+    print('Goodbye!')
     sys.exit(0)
 
 
@@ -129,17 +126,28 @@ def main():
 
     # TODO: add option for eth2
     IP = get_if_addr("eth1")
+    TCP_PORT = 2086
     print(f'Server started, listening on IP address {IP}')
 
-    while True:
-        thread = Thread(target = send_offer, args=[IP])
-        thread.start()
-        game = play(IP)
-        thread.join()
-        if game:
-            print('Game over, sending out offer requests...' )
-        else:
-            print('Looking for players...')
+    try:
+
+        # init socket to address family (host, port) and for TCP connection
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((IP, TCP_PORT))
+        server_socket.settimeout(10)
+
+        while True:
+            thread = Thread(target = send_offer, args=[IP])
+            thread.start()
+            game = play(server_socket)
+            thread.join()
+            if game:
+                print('Game over, sending out offer requests...' )
+            else:
+                print('Looking for players...')
+    finally:
+        print('closing socket')
+        server_socket.close()
 
 
 if __name__ == "__main__":
