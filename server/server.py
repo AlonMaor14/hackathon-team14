@@ -8,7 +8,7 @@ def send_offer(UDP_IP):
     UDP_PORT = 13117
 
     # prefix = 0xfeedbeef, type = 0x02, port = 2086
-    packet = struct.pack('lhh', 0xfeedbeef, 0x2, 0x2086)
+    packet = struct.pack('lhh', 0xfeedbeef, 0x2, 2086)
 
     # send offers for 10 seconds
     start_time = time.time()
