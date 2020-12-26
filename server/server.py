@@ -32,6 +32,7 @@ def listen_for_clients(TCP_IP):
     # we want it to queue up as many as 5 connect requests ?
     s.listen(5)
    
+    # TODO: add timeout 10 secs and manage players ir return false
     conn, addr = s.accept()
     print(f'Connection address:{addr}')
     data = conn.recv(BUFFER_SIZE)
@@ -42,6 +43,8 @@ def listen_for_clients(TCP_IP):
     return True
 
 def main():
+
+    # TODO: add option for eth2
     IP = get_if_addr("eth1")
     print(f'Server started, listening on IP address {IP}')
 
