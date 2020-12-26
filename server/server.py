@@ -23,7 +23,8 @@ def send_offer(UDP_IP):
 
 def listen_for_clients(TCP_IP):
     TCP_PORT = 2086
-    BUFFER_SIZE = 1024  # Normally 1024, but we want fast response
+    BUFFER_SIZE = 1024
+    teams = {}
     
     # init socket to address family (host, port) and for TCP connection
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,11 +37,25 @@ def listen_for_clients(TCP_IP):
     conn, addr = s.accept()
     print(f'Connection address:{addr}')
     data = conn.recv(BUFFER_SIZE)
-    print(f'received data:{data.decode("utf-8")}')
-    conn.send(data)  # echo
+    team_name = data.decode("utf-8")
+    print(f'received data:{tean_name}')
+    teams[team_name] = conn
+    conn.send(b'Welcome to Keyboard Spamming Battle Royale.')
+
+    # open threadpool
     time.sleep(5)
     conn.close()
     return True
+
+def player_runnable(conn):
+    BUFFER_SIZE = 1
+    score = 0
+    while True:
+        data = conn.recv(BUFFER_SIZE)
+        if not data: break
+        score += len(data)
+    return score
+
 
 def main():
 
