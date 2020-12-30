@@ -32,9 +32,6 @@ def play(server_socket):
     group1 = []
     group2 = []
 
-    # make socket a server's one, 5 is only advisory for num of connections
-    server_socket.listen(5)
-
     try:
         game = connect_to_clients(server_socket, teams, group1, group2)
 
@@ -50,7 +47,7 @@ def play(server_socket):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             scores_futures = []
             for team, conn in teams.items():
-                scores_futures.append(executor.submit(player_runnable, team=team, conn=conn))
+                scores_futures.append(executor.submit(player_runnable, team=team, conn=conn, game_time=5))
                 conn.sendall(b'START SPAMMING!!!!!\n')
 
             # Main thread computes results
@@ -83,11 +80,11 @@ def play(server_socket):
     
     return True
 
-def player_runnable(team, conn):
+def player_runnable(team, conn, game_time):
     BUFFER_SIZE = 1
     score = 0
     start_time = time.time()
-    while time.time() - start_time < 5:
+    while time.time() - start_time < game_time:
         readable, _, _ = select([conn], [], [])
         if readable:
             data = conn.recv(BUFFER_SIZE)
@@ -96,19 +93,22 @@ def player_runnable(team, conn):
             print(data.decode())
     return (team, score)
 
-def connect_to_clients(socket, teams, group1, group2):
+def connect_to_clients(sock, teams, group1, group2):
     BUFFER_SIZE = 1024
 
     # start game after 10 seconds
     start_time = time.time()
     group_index = 1
-    if time.time() - start_time < 10:
+    while time.time() - start_time < 10:
         try:
-            conn, _ = socket.accept()
+
+            sock.settimeout(time.time() - start_time)
+            conn, _ = sock.accept()
             conn.setblocking(False)
+
             data = conn.recv(BUFFER_SIZE)
             team_name = data.decode("utf-8")
-            print(f'Team: {team_name}')
+            print(colorize._colorize(f'Team: {team_name}', colorize.Colors.server))
 
             teams[team_name] = conn
 
@@ -117,12 +117,15 @@ def connect_to_clients(socket, teams, group1, group2):
                 group2.append(team_name)
             else:
                 group1.append(team_name)
+
             conn.sendall(b'Welcome to Keyboard Spamming Battle Royale.\n')
             group_index += 1
         except Exception as exc:
 
-            # TODO: handle timeout better
-            print(colorize._colorize(exc, colorize.Colors.fatal))
+            if str(exc) != 'timed out':
+                print(colorize._colorize(exc, colorize.Colors.fatal))
+
+    sock.settimeout(None)
     return group_index > 1
 
 def quit(sig, frame):
@@ -144,7 +147,9 @@ def main():
         # init socket to address family (host, port) and for TCP connection
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind((IP, TCP_PORT))
-        server_socket.settimeout(10)
+
+        # make socket a server's one, 5 is only advisory for num of connections
+        server_socket.listen(5)
 
         while True:
             thread = Thread(target = send_offer, args=[IP])
@@ -156,7 +161,7 @@ def main():
             else:
                 print('Looking for players...')
     finally:
-        print('closing socket')
+        print('Closing socket')
         server_socket.close()
 
 
