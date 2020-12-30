@@ -66,6 +66,7 @@ def connect_to_server(addr):
 
 def play(client_socket):
     thread = Thread(target=write_input, args=[client_socket])
+    thread.daemon = True
     thread.start()
     buffer = ''
     while True:
@@ -101,7 +102,7 @@ def write_input(client_socket):
             client_socket.sendall(sys.stdin.read(1).encode())
             i += 1
             time.sleep(0.2)
-    except Exception as e:
+    except Exception:
         pass
     finally:
         termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
@@ -109,15 +110,15 @@ def write_input(client_socket):
 
 
 def quit(sig, frame):
-    try:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, sys.__stdin__)
-    except Exception as e:
-        pass
+    if old_settings:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
     print(colorize.colorize('\nGoodbye! Got signal: '+str(sig), colorize.Colors.title))
     sys.exit(0)
 
 
 def main():
+    global old_settings
+    old_settings = None
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
 
