@@ -11,19 +11,21 @@ import colorize
 
 
 def send_offer(UDP_IP):
-    UDP_PORT = 13121
+    UDP_PORT = 13122
 
     # prefix = 0xfeedbeef, type = 0x02, port = 2086
-    packet = struct.pack('IBH', 0xfeedbeef, 0x2, 2086)
+    packet = struct.pack('!IBH', 0xfeedbeef, 0x2, 2086)
 
     # send offers for 10 seconds
     start_time = time.time()
 
-    # init socket to address family (host, port) and for UDP connection
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # init socket to address family (host, port) and for UDP connection on broadcast
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
     while time.time() - start_time < 10:
         sock.sendto(packet, (UDP_IP, UDP_PORT))
-        time.sleep(0.5)
+        time.sleep(1)
 
     sock.close()
 
@@ -95,6 +97,7 @@ def player_runnable(team, conn, game_time):
                 score += len(data)
             except Exception as exc:
                 print(colorize.colorize(exc, colorize.Colors.fatal))
+        time.sleep(0.5)
             
     return team, score
 
@@ -113,17 +116,18 @@ def connect_to_clients(sock, teams, group1, group2):
             conn.setblocking(False)
 
             data = conn.recv(BUFFER_SIZE)
-            team_name = data.decode("utf-8")
+            team_name = data.decode("utf-8")[:-1]
             print(colorize.colorize(f'Team: {team_name}', colorize.Colors.server))
 
-            teams[team_name] = conn
+            teams[team_name+"_"+str(group_index)] = conn
 
             # assign team to a group
             if group_index % 2 == 0:
-                group2.append(team_name)
+                group2.append(team_name+"_"+str(group_index))
             else:
-                group1.append(team_name)
+                group1.append(team_name+"_"+str(group_index))
 
+            time.sleep(0.1)
             group_index += 1
         except Exception as exc:
             if str(exc) != 'timed out':
@@ -142,7 +146,6 @@ def main():
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
 
-    # TODO: add option for eth2
     IP = get_if_addr("eth1")
     TCP_PORT = 2086
     print(colorize.colorize(f'Server started, listening on IP address {IP}'))
@@ -165,8 +168,8 @@ def main():
                 print('Game over, sending out offer requests...')
             else:
                 print('Looking for players...')
+            time.sleep(1)
     finally:
-        print('Closing socket')
         server_socket.close()
 
 

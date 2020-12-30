@@ -11,14 +11,16 @@ import colorize
 
 
 def listen_to_offers():
-    UDP_PORT = 13121
+    UDP_PORT = 13122
     MAGIC_COOKIE = 0xfeedbeef
     MSG_TYPE = 0x2
 
     print(colorize.colorize('Client started, listening for offer requests...'))
 
-    # init socket to address family (host, port) and for UDP connection
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # init socket to address family (host, port) and for UDP connection and broadcast
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.bind(('', UDP_PORT))
 
     while True:
@@ -26,8 +28,7 @@ def listen_to_offers():
 
             data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
 
-            msg = struct.unpack('IBH', data)
-            print(f'received message: {msg} from {addr}')
+            msg = struct.unpack('!IBH', data)
 
             # validate offer
             if len(msg) == 3 and msg[0] == MAGIC_COOKIE and msg[1] == MSG_TYPE:
@@ -35,6 +36,7 @@ def listen_to_offers():
 
                 # return tuple (server ip, server tcp port)
                 return addr[0], msg[2]
+            time.sleep(0.5)
 
         except Exception as exc:
             print(colorize.colorize(exc, colorize.Colors.error))
@@ -59,7 +61,6 @@ def connect_to_server(addr):
 
     finally:
 
-        print('Closing socket')
         client_socket.close()
 
 
@@ -78,8 +79,6 @@ def play(client_socket):
             if not data:
                 if buffer:
                     print(colorize.colorize(buffer, colorize.Colors.server))
-                thread.do_run = False
-                thread.join()
                 print(colorize.colorize('Disconnected from server', colorize.Colors.title))
                 break
             buffer += data.decode()
@@ -88,9 +87,11 @@ def play(client_socket):
                 buffer = ''
 
         time.sleep(0.5)
+    thread.join()
 
 
 def write_input(client_socket):
+    global old_settings
     old_settings = termios.tcgetattr(sys.stdin.fileno())
     try:
         tty.setcbreak(sys.stdin.fileno())
@@ -99,8 +100,8 @@ def write_input(client_socket):
             if client_socket.fileno() == -1:
                 break
             client_socket.sendall(sys.stdin.read(1).encode())
-            time.sleep(0.1)
             i += 1
+            time.sleep(0.2)
     except Exception as e:
         pass
     finally:
@@ -109,7 +110,8 @@ def write_input(client_socket):
 
 
 def quit(sig, frame):
-    print(colorize.colorize('\nGoodbye!', colorize.Colors.title))
+    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
+    print(colorize.colorize('\nGoodbye! Got signal: '+str(sig), colorize.Colors.title))
     sys.exit(0)
 
 
