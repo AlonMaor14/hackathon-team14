@@ -106,6 +106,7 @@ def main():
     while True:
         addr = listen_to_offers()
         connect_to_server(addr)
+        time.sleep(3)
 
 
 if __name__ == "__main__":

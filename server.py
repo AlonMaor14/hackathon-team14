@@ -81,13 +81,12 @@ def play(server_socket):
     return True
 
 def player_runnable(team, conn, game_time):
-    BUFFER_SIZE = 1
     score = 0
     start_time = time.time()
     while time.time() - start_time < game_time:
         readable, _, _ = select([conn], [], [])
         if readable:
-            data = conn.recv(BUFFER_SIZE)
+            data = conn.recv(1024)
             if not data: break
             score += len(data)
             print(data.decode())
@@ -99,7 +98,7 @@ def connect_to_clients(sock, teams, group1, group2):
     # start game after 10 seconds
     start_time = time.time()
     group_index = 1
-    while time.time() - start_time < 10:
+    while time.time() - start_time < 5:
         try:
 
             sock.settimeout(time.time() - start_time)
@@ -121,7 +120,6 @@ def connect_to_clients(sock, teams, group1, group2):
             conn.sendall(b'Welcome to Keyboard Spamming Battle Royale.\n')
             group_index += 1
         except Exception as exc:
-
             if str(exc) != 'timed out':
                 print(colorize._colorize(exc, colorize.Colors.fatal))
 
