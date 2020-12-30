@@ -14,18 +14,18 @@ def send_offer(UDP_IP):
     UDP_PORT = 13119
 
     # prefix = 0xfeedbeef, type = 0x02, port = 2086
-    packet = struct.pack('lhh', 0xfeedbeef, 0x2, 2086)
+    packet = struct.pack('sss', 0xfeedbeef, 0x2, 2086)
 
     # send offers for 10 seconds
     start_time = time.time()
 
     # init socket to address family (host, port) and for UDP connection
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    while(time.time() - start_time < 10):
+    while time.time() - start_time < 10:
         sock.sendto(packet, (UDP_IP, UDP_PORT))
-    
+
     sock.close()
-    
+
 
 def play(server_socket):
     teams = {}
@@ -36,9 +36,9 @@ def play(server_socket):
         game = connect_to_clients(server_socket, teams, group1, group2)
 
         # if no teams don't start game
-        if not game :
+        if not game:
             return False
-        
+
         for conn in teams.values():
             conn.sendall('Group 1 :\n==\n{0}\n'.format('\n'.join(group1)).encode())
             conn.sendall('Group 2 :\n==\n{0}\n'.format('\n'.join(group2)).encode())
@@ -57,7 +57,7 @@ def play(server_socket):
                 res = res.result()
                 if res[0] in group1:
                     g1_res += res[1]
-                else: 
+                else:
                     g2_res += res[1]
 
         game_over_msg = f'Game Over!\n Group 1 score: {g1_res}\n Group 2 score: {g2_res}\n'
@@ -67,18 +67,19 @@ def play(server_socket):
             game_over_msg += 'Winners : Group 2 !\n'
         else:
             game_over_msg += 'Tie !\n'
-        
+
         for conn in teams.values():
             conn.sendall(game_over_msg.encode())
 
     except Exception as exc:
-        print(colorize._colorize(exc, colorize.Colors.fatal))
+        print(colorize.colorize(exc, colorize.Colors.fatal))
 
     finally:
         for conn in teams.values():
             conn.close()
-    
+
     return True
+
 
 def player_runnable(team, conn, game_time):
     BUFFER_SIZE = 1
@@ -91,7 +92,8 @@ def player_runnable(team, conn, game_time):
             if not data: break
             score += len(data)
             print(data.decode())
-    return (team, score)
+    return team, score
+
 
 def connect_to_clients(sock, teams, group1, group2):
     BUFFER_SIZE = 1024
@@ -108,7 +110,7 @@ def connect_to_clients(sock, teams, group1, group2):
 
             data = conn.recv(BUFFER_SIZE)
             team_name = data.decode("utf-8")
-            print(colorize._colorize(f'Team: {team_name}', colorize.Colors.server))
+            print(colorize.colorize(f'Team: {team_name}', colorize.Colors.server))
 
             teams[team_name] = conn
 
@@ -123,10 +125,11 @@ def connect_to_clients(sock, teams, group1, group2):
         except Exception as exc:
 
             if str(exc) != 'timed out':
-                print(colorize._colorize(exc, colorize.Colors.fatal))
+                print(colorize.colorize(exc, colorize.Colors.fatal))
 
     sock.settimeout(None)
     return group_index > 1
+
 
 def quit(sig, frame):
     print('\nGoodbye!')
@@ -152,12 +155,12 @@ def main():
         server_socket.listen(5)
 
         while True:
-            thread = Thread(target = send_offer, args=[IP])
+            thread = Thread(target=send_offer, args=[IP])
             thread.start()
             game = play(server_socket)
             thread.join()
             if game:
-                print('Game over, sending out offer requests...' )
+                print('Game over, sending out offer requests...')
             else:
                 print('Looking for players...')
     finally:

@@ -1,6 +1,7 @@
 import colorama
 
-def _colorize(text, color='blue'):
+
+def colorize(text, color='blue'):
     if text == '':
         return ''
     if color is None:
@@ -9,8 +10,8 @@ def _colorize(text, color='blue'):
     reset_color = colorama.Fore.RESET
     return f'{color}{text}{reset_color}'
 
-class Colors(object):
 
+class Colors(object):
     server = 'green'
     error = 'cyan'
     fatal = 'red'
