@@ -117,7 +117,7 @@ def connect_to_clients(socket, teams, group1, group2):
     return group_index > 1
 
 def quit(sig, frame):
-    print('Goodbye!')
+    print('\nGoodbye!')
     sys.exit(0)
 
 
