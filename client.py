@@ -3,12 +3,28 @@ import time
 import struct
 import signal
 import asyncio
+import select
 from scapy.all import *
 
 import colorize
 
+class _GetchUnix:
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+
 def listen_to_offers():
-    UDP_PORT = 13117
+    UDP_PORT = 13119
     MAGIC_COOKIE = 0xfeedbeef
     MSG_TYPE = 0x2
 
@@ -29,57 +45,52 @@ def listen_to_offers():
 
             # validate offer
             if len(msg) == 3 and msg[0] == MAGIC_COOKIE and msg[1] == MSG_TYPE:
-                print(f'Received offer from {addr[0]}, attempting to connect...')
                 sock.close()
 
                 # return tuple (server ip, server tcp port)
                 return (addr[0], msg[2])
 
         except Exception as exc:
-
-            # TODO: handle errors
-            raise exc
+            print(colorize._colorize(exc, colorize.Colors.error))
 
 def connect_to_server(addr):
 
     # init socket to address family (host, port) and for TCP connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.setblocking(0)
 
     try:
-    
+        print(f'Received offer from {addr[0]}, attempting to connect...')
         client_socket.connect((addr[0], addr[1]))
         message = b'Catan settlers'
         client_socket.sendall(message)
+        play(client_socket)
 
-        # start async IO
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(read(client_socket)) # maybe run_forever ?
-        loop.create_task(write)
+    except Exception as exc:
+        print(colorize._colorize(exc, colorize.Colors.fatal))
 
     finally:
-        loop.close()
+
         print('closing socket')
         client_socket.close()
 
-async def read(client_socket):
+def play(client_socket):
     buffer = ''
-    while True:
-        await data = client_socket.recv(1024)
-        if data:
-            buffer += data.decode()
-            if '\n' in buffer:
-                print(buffer)
-                buffer = ''
-        else:
-            break
-
-async def write(client_socket):
     getch = _GetchUnix()
     while True:
-        ch = await getch.__call__()
-        await client_socket.send(ch)
+        readable, writeable, _ = select([client_socket], [client_socket], [], 0)
+        if readable:
+            data = client_socket.recv(1024)
+            if not data:
+                print(colorize._colorize('Disconnected from server', colorize.Colors.title))
+            buffer += data.decode()
+            if '\n' in buffer:
+                print(colorize._colorize(buffer, colorize.Colors.server))
+                buffer = ''
+        elif writeable:
+            ch = getch.__call__()
+            client_socket.send(ch)
         
-
 def quit(sig, frame):
     print(colorize._colorize('\nGoodbye!', colorize.Colors.title))
     sys.exit(0)
@@ -95,18 +106,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-class _GetchUnix:
-    def __init__(self):
-        import tty, sys
-
-    def __call__(self):
-        import sys, tty, termios
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch

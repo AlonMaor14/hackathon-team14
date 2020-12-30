@@ -9,7 +9,7 @@ import concurrent.futures
 
 
 def send_offer(UDP_IP):
-    UDP_PORT = 13117
+    UDP_PORT = 13119
 
     # prefix = 0xfeedbeef, type = 0x02, port = 2086
     packet = struct.pack('lhh', 0xfeedbeef, 0x2, 2086)
@@ -82,9 +82,11 @@ def player_runnable(team, conn):
     BUFFER_SIZE = 1
     score = 0
     while True:
+        print('reading')
         data = conn.recv(BUFFER_SIZE)
         if not data: break
         score += len(data)
+        print(data)
     return (team, score)
 
 def connect_to_clients(socket, teams, group1, group2):
@@ -96,7 +98,7 @@ def connect_to_clients(socket, teams, group1, group2):
     if time.time() - start_time < 10:
         try:
             conn, _ = socket.accept()
-
+            conn.setblocking(False)
             data = conn.recv(BUFFER_SIZE)
             team_name = data.decode("utf-8")
             print(f'Team: {team_name}')

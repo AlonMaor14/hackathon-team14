@@ -11,7 +11,7 @@ def _colorize(text, color='blue'):
 
 class Colors(object):
 
-    info = 'green'
+    server = 'green'
     error = 'cyan'
     fatal = 'red'
     title = 'yellow'
