@@ -123,6 +123,7 @@ def quit(sig, frame):
 
 def main():
     signal.signal(signal.SIGINT, quit)
+    signal.signal(signal.SIGTERM, quit)
 
     # TODO: add option for eth2
     IP = get_if_addr("eth1")

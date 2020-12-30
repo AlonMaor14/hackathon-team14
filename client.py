@@ -2,6 +2,7 @@ import socket
 import time
 import struct
 import signal
+import asyncio
 from scapy.all import *
 
 import colorize
@@ -50,20 +51,34 @@ def connect_to_server(addr):
         message = b'Catan settlers'
         client_socket.sendall(message)
 
-        buffer = ''
-        while True:
-            data = client_socket.recv(1024)
-            if data:
-                buffer += data.decode()
-                if '\n' in buffer:
-                    print(buffer)
-                    buffer = ''
-            else:
-                break
+        # start async IO
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(read(client_socket)) # maybe run_forever ?
+        loop.create_task(write)
 
     finally:
+        loop.close()
         print('closing socket')
         client_socket.close()
+
+async def read(client_socket):
+    buffer = ''
+    while True:
+        await data = client_socket.recv(1024)
+        if data:
+            buffer += data.decode()
+            if '\n' in buffer:
+                print(buffer)
+                buffer = ''
+        else:
+            break
+
+async def write(client_socket):
+    getch = _GetchUnix()
+    while True:
+        ch = await getch.__call__()
+        await client_socket.send(ch)
+        
 
 def quit(sig, frame):
     print(colorize._colorize('\nGoodbye!', colorize.Colors.title))
@@ -71,6 +86,7 @@ def quit(sig, frame):
 
 def main():
     signal.signal(signal.SIGINT, quit)
+    signal.signal(signal.SIGTERM, quit)
 
     while True:
         addr = listen_to_offers()
@@ -79,3 +95,18 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+class _GetchUnix:
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
