@@ -2,26 +2,13 @@ import socket
 import time
 import struct
 import signal
-import asyncio
+import sys
 import select
+import tty
+import termios
 from scapy.all import *
 
 import colorize
-
-class _GetchUnix:
-    def __init__(self):
-        import tty, sys
-
-    def __call__(self):
-        import sys, tty, termios
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(sys.stdin.fileno())
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
 
 def listen_to_offers():
     UDP_PORT = 13119
@@ -57,13 +44,14 @@ def connect_to_server(addr):
 
     # init socket to address family (host, port) and for TCP connection
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.setblocking(0)
 
     try:
         print(f'Received offer from {addr[0]}, attempting to connect...')
         client_socket.connect((addr[0], addr[1]))
-        message = b'Catan settlers'
-        client_socket.sendall(message)
+        client_socket.setblocking(False)
+
+        team_name = b'Catan settlers\n'
+        client_socket.sendall(team_name)
         play(client_socket)
 
     except Exception as exc:
@@ -76,20 +64,36 @@ def connect_to_server(addr):
 
 def play(client_socket):
     buffer = ''
-    getch = _GetchUnix()
     while True:
-        readable, writeable, _ = select([client_socket], [client_socket], [], 0)
+
+        # check if we can read from server or write to it
+        readable, _, _ = select([client_socket], [], [])
         if readable:
             data = client_socket.recv(1024)
+
+            # EOF means server disconnected
             if not data:
+                if buffer:
+                    print(colorize._colorize(buffer, colorize.Colors.server))
                 print(colorize._colorize('Disconnected from server', colorize.Colors.title))
+                break
             buffer += data.decode()
             if '\n' in buffer:
                 print(colorize._colorize(buffer, colorize.Colors.server))
                 buffer = ''
-        elif writeable:
-            ch = getch.__call__()
-            client_socket.send(ch)
+        else:
+            read_stdin(client_socket)
+            
+
+def read_stdin(client_socket):
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        if select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
+            client_socket.send(sys.stdin.read(1).encode())
+
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
         
 def quit(sig, frame):
     print(colorize._colorize('\nGoodbye!', colorize.Colors.title))

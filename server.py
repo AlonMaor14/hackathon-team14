@@ -7,6 +7,8 @@ import sys
 from scapy.all import *
 import concurrent.futures
 
+import colorize
+
 
 def send_offer(UDP_IP):
     UDP_PORT = 13119
@@ -33,7 +35,6 @@ def play(server_socket):
     # make socket a server's one, 5 is only advisory for num of connections
     server_socket.listen(5)
 
-    game_over_msg = 'Some wierd stuff happend\n'
     try:
         game = connect_to_clients(server_socket, teams, group1, group2)
 
@@ -42,15 +43,15 @@ def play(server_socket):
             return False
         
         for conn in teams.values():
-            conn.send('Group 1 :\n==\n{0}\n'.format('\n'.join(group1)).encode())
-            conn.send('Group 2 :\n==\n{0}\n'.format('\n'.join(group2)).encode())
+            conn.sendall('Group 1 :\n==\n{0}\n'.format('\n'.join(group1)).encode())
+            conn.sendall('Group 2 :\n==\n{0}\n'.format('\n'.join(group2)).encode())
 
         # shutdown automatically
         with concurrent.futures.ThreadPoolExecutor() as executor:
             scores_futures = []
             for team, conn in teams.items():
                 scores_futures.append(executor.submit(player_runnable, team=team, conn=conn))
-                conn.send(b'START SPAMMING!!!!!\n')
+                conn.sendall(b'START SPAMMING!!!!!\n')
 
             # Main thread computes results
             g1_res = 0
@@ -69,11 +70,15 @@ def play(server_socket):
             game_over_msg += 'Winners : Group 2 !\n'
         else:
             game_over_msg += 'Tie !\n'
-
         
+        for conn in teams.values():
+            conn.sendall(game_over_msg.encode())
+
+    except Exception as exc:
+        print(colorize._colorize(exc, colorize.Colors.fatal))
+
     finally:
         for conn in teams.values():
-            conn.send(struct.pack('s', game_over_msg.encode()))
             conn.close()
     
     return True
@@ -81,12 +86,14 @@ def play(server_socket):
 def player_runnable(team, conn):
     BUFFER_SIZE = 1
     score = 0
-    while True:
-        print('reading')
-        data = conn.recv(BUFFER_SIZE)
-        if not data: break
-        score += len(data)
-        print(data)
+    start_time = time.time()
+    while time.time() - start_time < 5:
+        readable, _, _ = select([conn], [], [])
+        if readable:
+            data = conn.recv(BUFFER_SIZE)
+            if not data: break
+            score += len(data)
+            print(data.decode())
     return (team, score)
 
 def connect_to_clients(socket, teams, group1, group2):
@@ -110,12 +117,12 @@ def connect_to_clients(socket, teams, group1, group2):
                 group2.append(team_name)
             else:
                 group1.append(team_name)
-            conn.send(b'Welcome to Keyboard Spamming Battle Royale.\n')
+            conn.sendall(b'Welcome to Keyboard Spamming Battle Royale.\n')
             group_index += 1
         except Exception as exc:
 
             # TODO: handle timeout better
-            print('Error {0}'.format(exc))
+            print(colorize._colorize(exc, colorize.Colors.fatal))
     return group_index > 1
 
 def quit(sig, frame):
