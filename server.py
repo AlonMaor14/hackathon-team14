@@ -11,21 +11,22 @@ import colorize
 
 
 def send_offer(UDP_IP):
-    UDP_PORT = 13119
+    UDP_PORT = 13121
 
     # prefix = 0xfeedbeef, type = 0x02, port = 2086
-    packet = struct.pack('lhh', 0xfeedbeef, 0x2, 2086)
+    packet = struct.pack('IBH', 0xfeedbeef, 0x2, 2086)
 
     # send offers for 10 seconds
     start_time = time.time()
 
     # init socket to address family (host, port) and for UDP connection
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    while(time.time() - start_time < 10):
+    while time.time() - start_time < 10:
         sock.sendto(packet, (UDP_IP, UDP_PORT))
-    
+        time.sleep(0.5)
+
     sock.close()
-    
+
 
 def play(server_socket):
     teams = {}
@@ -36,10 +37,11 @@ def play(server_socket):
         game = connect_to_clients(server_socket, teams, group1, group2)
 
         # if no teams don't start game
-        if not game :
+        if not game:
             return False
-        
+
         for conn in teams.values():
+            conn.sendall(b'Welcome to Keyboard Spamming Battle Royale.\n')
             conn.sendall('Group 1 :\n==\n{0}\n'.format('\n'.join(group1)).encode())
             conn.sendall('Group 2 :\n==\n{0}\n'.format('\n'.join(group2)).encode())
 
@@ -47,7 +49,7 @@ def play(server_socket):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             scores_futures = []
             for team, conn in teams.items():
-                scores_futures.append(executor.submit(player_runnable, team=team, conn=conn, game_time=5))
+                scores_futures.append(executor.submit(player_runnable, team=team, conn=conn, game_time=10))
                 conn.sendall(b'START SPAMMING!!!!!\n')
 
             # Main thread computes results
@@ -57,7 +59,7 @@ def play(server_socket):
                 res = res.result()
                 if res[0] in group1:
                     g1_res += res[1]
-                else: 
+                else:
                     g2_res += res[1]
 
         game_over_msg = f'Game Over!\n Group 1 score: {g1_res}\n Group 2 score: {g2_res}\n'
@@ -67,18 +69,19 @@ def play(server_socket):
             game_over_msg += 'Winners : Group 2 !\n'
         else:
             game_over_msg += 'Tie !\n'
-        
+
         for conn in teams.values():
             conn.sendall(game_over_msg.encode())
 
     except Exception as exc:
-        print(colorize._colorize(exc, colorize.Colors.fatal))
+        print(colorize.colorize(exc, colorize.Colors.fatal))
 
     finally:
         for conn in teams.values():
             conn.close()
-    
+
     return True
+
 
 def player_runnable(team, conn, game_time):
     score = 0
@@ -86,11 +89,15 @@ def player_runnable(team, conn, game_time):
     while time.time() - start_time < game_time:
         readable, _, _ = select([conn], [], [])
         if readable:
-            data = conn.recv(1024)
-            if not data: break
-            score += len(data)
-            print(data.decode())
-    return (team, score)
+            try:
+                data = conn.recv(1024)
+                if not data: break
+                score += len(data)
+            except Exception as exc:
+                print(colorize.colorize(exc, colorize.Colors.fatal))
+            
+    return team, score
+
 
 def connect_to_clients(sock, teams, group1, group2):
     BUFFER_SIZE = 1024
@@ -98,7 +105,7 @@ def connect_to_clients(sock, teams, group1, group2):
     # start game after 10 seconds
     start_time = time.time()
     group_index = 1
-    while time.time() - start_time < 5:
+    while time.time() - start_time < 10:
         try:
 
             sock.settimeout(time.time() - start_time)
@@ -107,7 +114,7 @@ def connect_to_clients(sock, teams, group1, group2):
 
             data = conn.recv(BUFFER_SIZE)
             team_name = data.decode("utf-8")
-            print(colorize._colorize(f'Team: {team_name}', colorize.Colors.server))
+            print(colorize.colorize(f'Team: {team_name}', colorize.Colors.server))
 
             teams[team_name] = conn
 
@@ -117,14 +124,14 @@ def connect_to_clients(sock, teams, group1, group2):
             else:
                 group1.append(team_name)
 
-            conn.sendall(b'Welcome to Keyboard Spamming Battle Royale.\n')
             group_index += 1
         except Exception as exc:
             if str(exc) != 'timed out':
-                print(colorize._colorize(exc, colorize.Colors.fatal))
+                print(colorize.colorize(exc, colorize.Colors.fatal))
 
     sock.settimeout(None)
     return group_index > 1
+
 
 def quit(sig, frame):
     print('\nGoodbye!')
@@ -138,7 +145,7 @@ def main():
     # TODO: add option for eth2
     IP = get_if_addr("eth1")
     TCP_PORT = 2086
-    print(f'Server started, listening on IP address {IP}')
+    print(colorize.colorize(f'Server started, listening on IP address {IP}'))
 
     try:
 
@@ -150,12 +157,12 @@ def main():
         server_socket.listen(5)
 
         while True:
-            thread = Thread(target = send_offer, args=[IP])
+            thread = Thread(target=send_offer, args=[IP])
             thread.start()
             game = play(server_socket)
             thread.join()
             if game:
-                print('Game over, sending out offer requests...' )
+                print('Game over, sending out offer requests...')
             else:
                 print('Looking for players...')
     finally:
