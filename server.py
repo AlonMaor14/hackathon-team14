@@ -154,6 +154,7 @@ def main():
 
         # init socket to address family (host, port) and for TCP connection
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind((IP, TCP_PORT))
 
         # make socket a server's one, 5 is only advisory for num of connections

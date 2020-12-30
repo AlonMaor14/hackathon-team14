@@ -91,7 +91,6 @@ def play(client_socket):
 
 
 def write_input(client_socket):
-    global old_settings
     old_settings = termios.tcgetattr(sys.stdin.fileno())
     try:
         tty.setcbreak(sys.stdin.fileno())
@@ -110,7 +109,10 @@ def write_input(client_socket):
 
 
 def quit(sig, frame):
-    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
+    try:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, sys.__stdin__)
+    except Exception as e:
+        pass
     print(colorize.colorize('\nGoodbye! Got signal: '+str(sig), colorize.Colors.title))
     sys.exit(0)
 
@@ -122,7 +124,6 @@ def main():
     while True:
         addr = listen_to_offers()
         connect_to_server(addr)
-        time.sleep(3)
 
 
 if __name__ == "__main__":
