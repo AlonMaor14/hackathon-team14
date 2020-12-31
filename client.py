@@ -12,7 +12,7 @@ import colorize
 
 
 def listen_to_offers():
-    UDP_PORT = 13122
+    UDP_PORT = 13117
     MAGIC_COOKIE = 0xfeedbeef
     MSG_TYPE = 0x2
 
