@@ -116,7 +116,7 @@ def write_input(client_socket):
 
 def quit(sig, frame):
     os.system('reset')
-    print(colorize.colorize('\nGoodbye! Got signal: '+str(sig), colorize.Colors.title))
+    print(colorize.colorize('\nGoodbye! Enter q to quit:', colorize.Colors.title))
     sys.exit(0)
 
 

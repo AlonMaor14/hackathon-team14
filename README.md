@@ -8,3 +8,5 @@ This is a special one made by the great Team 14.
 
 Let The Games Begin ! Enjoy !
 
+Note: to run on the test network enter flag argument '-t' when starting the server.
+

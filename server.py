@@ -147,7 +147,12 @@ def main():
     signal.signal(signal.SIGINT, quit)
     signal.signal(signal.SIGTERM, quit)
 
-    IP = get_if_addr("eth1")
+    IP = None
+    if len(sys.argv) > 1 and sys.argv[1] == '-t':
+        IP = get_if_addr("eth2")
+    else:
+        IP = get_if_addr("eth1")
+
     TCP_PORT = 2086
     print(colorize.colorize(f'Server started, listening on IP address {IP}'))
 
