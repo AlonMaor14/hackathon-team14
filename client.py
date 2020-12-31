@@ -2,6 +2,7 @@ import socket
 import struct
 import signal
 import sys
+import os
 import select
 import tty
 import termios
@@ -23,7 +24,8 @@ def listen_to_offers():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.bind(('', UDP_PORT))
 
-    while True:
+    got_offer = False
+    while not got_offer:
         try:
 
             data, addr = sock.recvfrom(1024)  # buffer size is 1024 bytes
@@ -32,6 +34,7 @@ def listen_to_offers():
 
             # validate offer
             if len(msg) == 3 and msg[0] == MAGIC_COOKIE and msg[1] == MSG_TYPE:
+                got_offer = True
                 sock.close()
 
                 # return tuple (server ip, server tcp port)
@@ -66,7 +69,6 @@ def connect_to_server(addr):
 
 def play(client_socket):
     thread = Thread(target=write_input, args=[client_socket])
-    thread.daemon = True
     thread.start()
     buffer = ''
     while True:
@@ -88,6 +90,7 @@ def play(client_socket):
                 buffer = ''
 
         time.sleep(0.5)
+    print(colorize.colorize('Press anything to continue', colorize.Colors.pink))
     thread.join()
 
 
@@ -96,7 +99,9 @@ def write_input(client_socket):
     try:
         tty.setcbreak(sys.stdin.fileno())
         i = 0
-        while i < 100:
+
+        # run approx 10 sec
+        while i < 50:
             if client_socket.fileno() == -1:
                 break
             client_socket.sendall(sys.stdin.read(1).encode())
@@ -110,8 +115,7 @@ def write_input(client_socket):
 
 
 def quit(sig, frame):
-    if old_settings:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
+    os.system('reset')
     print(colorize.colorize('\nGoodbye! Got signal: '+str(sig), colorize.Colors.title))
     sys.exit(0)
 

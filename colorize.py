@@ -16,3 +16,4 @@ class Colors(object):
     error = 'cyan'
     fatal = 'red'
     title = 'yellow'
+    pink = 'magenta'

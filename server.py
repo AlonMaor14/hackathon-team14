@@ -79,6 +79,7 @@ def play(server_socket):
         print(colorize.colorize(exc, colorize.Colors.fatal))
 
     finally:
+        time.sleep(len(teams))
         for conn in teams.values():
             conn.close()
 
